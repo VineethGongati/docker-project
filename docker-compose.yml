@@ -1,0 +1,44 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro   # bind mount
+    networks: [frontend]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build: ./app
+    env_file: .env
+    networks: [frontend, backend]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data    # named volume
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    networks: [backend]
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  pgdata:
